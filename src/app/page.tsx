@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState, useSyncExternalStore } from "react";
 
 type Task = {
   id: string;
@@ -15,6 +15,60 @@ const starterTasks: Task[] = [
   { id: "nextjs", title: "Study Next.js", completed: false },
   { id: "git", title: "Set up Git repository", completed: true },
 ];
+const storageKey = "todo-devops-tasks";
+const starterTasksSnapshot = JSON.stringify(starterTasks);
+
+function subscribeToTasks(onChange: () => void) {
+  window.addEventListener("storage", onChange);
+  window.addEventListener("todo-devops-tasks", onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+    window.removeEventListener("todo-devops-tasks", onChange);
+  };
+}
+
+function getTasksSnapshot() {
+  return window.localStorage.getItem(storageKey) ?? starterTasksSnapshot;
+}
+
+function getServerTasksSnapshot() {
+  return starterTasksSnapshot;
+}
+
+function parseTasks(snapshot: string): Task[] {
+  try {
+    const tasks: unknown = JSON.parse(snapshot);
+    if (
+      Array.isArray(tasks) &&
+      tasks.every(
+        (task) =>
+          typeof task.id === "string" &&
+          typeof task.title === "string" &&
+          typeof task.completed === "boolean",
+      )
+    ) {
+      return tasks as Task[];
+    }
+  } catch {
+    return starterTasks;
+  }
+  return starterTasks;
+}
+
+function useTasks() {
+  const snapshot = useSyncExternalStore(
+    subscribeToTasks,
+    getTasksSnapshot,
+    getServerTasksSnapshot,
+  );
+  return parseTasks(snapshot);
+}
+
+function updateTasks(update: (current: Task[]) => Task[]) {
+  const nextTasks = update(parseTasks(getTasksSnapshot()));
+  window.localStorage.setItem(storageKey, JSON.stringify(nextTasks));
+  window.dispatchEvent(new Event("todo-devops-tasks"));
+}
 
 const filters: { value: Filter; label: string }[] = [
   { value: "all", label: "All tasks" },
@@ -23,35 +77,16 @@ const filters: { value: Filter; label: string }[] = [
 ];
 
 export default function Home() {
-  const [tasks, setTasks] = useState<Task[]>(starterTasks);
+  const tasks = useTasks();
   const [filter, setFilter] = useState<Filter>("all");
   const [input, setInput] = useState("");
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    const savedTasks = window.localStorage.getItem("todo-devops-tasks");
-    if (savedTasks) {
-      try {
-        setTasks(JSON.parse(savedTasks) as Task[]);
-      } catch {
-        window.localStorage.removeItem("todo-devops-tasks");
-      }
-    }
-    setReady(true);
-  }, []);
-
-  useEffect(() => {
-    if (ready) {
-      window.localStorage.setItem("todo-devops-tasks", JSON.stringify(tasks));
-    }
-  }, [ready, tasks]);
 
   function addTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const title = input.trim();
     if (!title) return;
 
-    setTasks((current) => [
+    updateTasks((current) => [
       { id: crypto.randomUUID(), title, completed: false },
       ...current,
     ]);
@@ -60,7 +95,7 @@ export default function Home() {
   }
 
   function toggleTask(id: string) {
-    setTasks((current) =>
+    updateTasks((current) =>
       current.map((task) =>
         task.id === id ? { ...task, completed: !task.completed } : task,
       ),
@@ -68,7 +103,7 @@ export default function Home() {
   }
 
   function deleteTask(id: string) {
-    setTasks((current) => current.filter((task) => task.id !== id));
+    updateTasks((current) => current.filter((task) => task.id !== id));
   }
 
   const visibleTasks = tasks.filter((task) => {
