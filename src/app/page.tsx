@@ -85,13 +85,13 @@ export default function Home() {
           <span className="wordmark-icon" aria-hidden="true">d.</span>
           <span>daymark</span>
         </a>
-        <span className="environment-tag"><span />Production · v1.0</span>
+        <span className="environment-tag"><span />Development · v1.1</span>
       </header>
 
       <section className="todo-shell" id="home" aria-labelledby="page-title">
         <div className="intro">
           <p className="eyebrow">A little more room to think</p>
-          <h1 id="page-title">My ToDo App <span>— Version 1.0</span></h1>
+          <h1 id="page-title">My ToDo App <span>— Version 1.1 Development</span></h1>
           <p className="date-line">Make today count, one thing at a time.</p>
         </div>
 
